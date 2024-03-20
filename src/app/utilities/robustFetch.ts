@@ -8,20 +8,20 @@ type Summary = {
 
 interface RobustFetchParams {
   url: string;
-  abortSignal?: AbortSignal;
+  options?: RequestInit;
   retries?: number;
   timer?: number;
   verbose?: boolean;
   logger?: (summary: Summary) => void;
 }
 
-export default function robustFetch<T>({ url, abortSignal, retries = 3, timer = 300, verbose, logger }: RobustFetchParams): Promise<T|Error> {
+export default function robustFetch<T>({ url, options, retries = 3, timer = 300, verbose, logger }: RobustFetchParams): Promise<T|Error> {
   // const isVerbose = typeof verbose !== 'undefined' ? verbose : import.meta.env.MODE === 'dev' || import.meta.env.MODE === 'testing'; // Vite SPA
   const isVerbose = typeof verbose !== 'undefined' ? verbose : process.env.NODE_ENV === 'development'; // Next.js
 
   let currentResponse: Response;
 
-  return fetch(url, {signal: abortSignal})
+  return fetch(url, options)
     .then(response => {
       currentResponse = response;
 
@@ -35,7 +35,7 @@ export default function robustFetch<T>({ url, abortSignal, retries = 3, timer = 
     }).catch(async error => {
 
       // Aborted. Exit without logging
-      if(abortSignal?.aborted) {
+      if(options?.signal?.aborted) {
         throw error; // exit, no retries.
       }
 
@@ -55,6 +55,6 @@ export default function robustFetch<T>({ url, abortSignal, retries = 3, timer = 
       // Failure, but can retry
       isVerbose && console.log(`Retrying fetch (${url})... Attempts left: ${retries}`, error.message);
       return new Promise(resolve => setTimeout(resolve, timer))
-        .then(() => robustFetch({url, abortSignal, retries: retries - 1, timer: timer * 2, verbose, logger}));
+        .then(() => robustFetch({url, options, retries: retries - 1, timer: timer * 2, verbose, logger}));
     });
 }
